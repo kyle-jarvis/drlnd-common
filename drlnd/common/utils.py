@@ -12,15 +12,14 @@ import pandas
 from unityagents import UnityEnvironment
 
 
-solution_directory = os.path.abspath(os.path.dirname(__file__))
-environments_directory = os.path.join(solution_directory, 'unity_environments')
-results_directory = os.path.join(solution_directory, 'results')
-
-
 class BananaEnv(Enum):
     STANDARD = 'Banana_Linux/Banana.x86_64'
     HEADLESS = 'Banana_Linux_NoVis/Banana.x86_64'
     VISUAL = 'VisualBanana_Linux/Banana.x86_64'
+
+
+def path_from_project_home(path:str):
+    return os.path.join(os.environ['PROJECT_HOME'], path)
 
 
 def get_environment_executable(environment: BananaEnv) -> str:
@@ -34,8 +33,8 @@ def get_environment_executable(environment: BananaEnv) -> str:
     :rtype: str
     """
     assert isinstance(environment, BananaEnv)
-    print(environments_directory, environment)
-    return os.path.join(environments_directory, environment.value)
+    base_directory = path_from_project_home('unity_environments')
+    return os.path.join(base_directory, environment.value)
 
 
 def get_env(headless: bool) -> UnityEnvironment:
@@ -84,6 +83,7 @@ def get_next_results_directory() -> str:
     :rtype: str
     """
     pattern = re.compile('run([0-9]*)')
+    results_directory = path_from_project_home('results')
     if not os.path.exists(results_directory):
         os.mkdir(results_directory)
     contents = os.listdir(results_directory)
@@ -101,6 +101,7 @@ def get_next_results_directory() -> str:
 
 
 def _load_results(learning_strategy: str, n_points: int):
+    solution_directory = os.environ["PROJECT_HOME"]
     checkpoint_directory = f'checkpoints/{learning_strategy}'
     scores_file = os.path.join(solution_directory, checkpoint_directory, 'scores.txt')
     scores = pandas.Series(np.loadtxt(scores_file)[:n_points])
@@ -111,6 +112,7 @@ def _load_results(learning_strategy: str, n_points: int):
 
 
 def load_results(directory: str):
+    results_directory = path_from_project_home('results')
     conf_path = os.path.join(results_directory, directory, 'parameters.yml')
     with open(conf_path, 'r') as f:
         conf =  yaml.load(f, Loader=yaml.BaseLoader)
