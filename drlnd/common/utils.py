@@ -18,8 +18,13 @@ class BananaEnv(Enum):
     VISUAL = 'VisualBanana_Linux/Banana.x86_64'
 
 
-def path_from_project_home(path:str):
-    return os.path.join(os.environ['PROJECT_HOME'], path)
+def path_from_project_home(path:str, or_else: None):
+    origin = (
+        os.environ['PROJECT_HOME'] if 'PROJECT_HOME' in os.environ
+        else or_else
+    )
+    assert origin is not None
+    return os.path.join(origin, path)
 
 
 def get_environment_executable(environment: BananaEnv) -> str:
