@@ -5,7 +5,7 @@ import random
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from model import QNetwork
+from .model import QNetwork
 
 
 BUFFER_SIZE = int(1e5)  # replay buffer size
