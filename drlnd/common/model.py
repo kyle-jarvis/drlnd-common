@@ -27,3 +27,22 @@ class QNetwork(nn.Module):
         x = F.relu(x)
         x = self.fc3(x)
         return x
+
+
+class PolicyNetwork(nn.Module):
+    def __init__(self, seed, state_size: int, action_size: int, hidden_layer_size: int = 256, output_activation = F.tanh):
+        super(PolicyNetwork, self).__init__()
+        self.seed = torch.manual_seed(seed)
+
+        self.fc1 = torch.nn.Linear(state_size, hidden_layer_size)
+        self.fc2 = torch.nn.Linear(hidden_layer_size, hidden_layer_size)
+        self.fc3 = torch.nn.Linear(hidden_layer_size, action_size)
+
+        self.output_activation = output_activation
+
+    def forward(self, state):
+        x = F.relu(self.fc1(state))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        x = self.output_activation(x)
+        return x

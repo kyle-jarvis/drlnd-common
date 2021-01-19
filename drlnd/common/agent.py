@@ -5,7 +5,7 @@ import random
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from .model import QNetwork
+from .model import QNetwork, PolicyNetwork
 
 
 BUFFER_SIZE = int(1e5)  # replay buffer size
@@ -25,6 +25,10 @@ class LearningStrategy(Enum):
 class TargetNetworkUpdateStrategy(Enum):
     SOFT = 1
     HARD = 2
+
+class ActionType(Enum):
+    DISCRETE = 1
+    CONTINUOUS = 2
 
 class Agent():
     """Interacts with and learns from the environment."""
@@ -201,7 +205,7 @@ class Agent():
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
-    def __init__(self, action_size, buffer_size, batch_size, seed):
+    def __init__(self, action_size, buffer_size, batch_size, seed, action_dtype: ActionType = ActionType.DISCRETE):
         """Initialize a ReplayBuffer object.
 
         Params
@@ -216,6 +220,11 @@ class ReplayBuffer:
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
         self.seed = random.seed(seed)
+
+        if action_dtype == ActionType.CONTINUOUS:
+            self.get_action_as = lambda tensor: tensor.float()
+        elif action_dtype == ActionType.DISCRETE:
+            self.get_action_as = lambda tensor: tensor.long()
     
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
@@ -227,7 +236,7 @@ class ReplayBuffer:
         experiences = random.sample(self.memory, k=self.batch_size)
 
         states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(device)
-        actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).long().to(device)
+        actions = self.get_action_as(torch.from_numpy(np.vstack([e.action for e in experiences if e is not None]))).to(device)
         rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(device)
         next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(device)
         dones = torch.from_numpy(np.vstack([e.done for e in experiences if e is not None]).astype(np.uint8)).float().to(device)
@@ -237,3 +246,74 @@ class ReplayBuffer:
     def __len__(self):
         """Return the current size of internal memory."""
         return len(self.memory)
+
+
+def hard_update(local_model, target_model):
+    """Hard update model parameters.
+
+    Params
+    ======
+        local_model (PyTorch model): weights will be copied from
+        target_model (PyTorch model): weights will be copied to
+    """
+    for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
+        target_param.data.copy_(local_param.data)
+
+
+def soft_update(local_model, target_model, tau):
+    """Soft update model parameters.
+    θ_target = τ*θ_local + (1 - τ)*θ_target
+
+    Params
+    ======
+        local_model (PyTorch model): weights will be copied from
+        target_model (PyTorch model): weights will be copied to
+        tau (float): interpolation parameter 
+    """
+    for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
+        target_param.data.copy_(tau*local_param.data + (1.0-tau)*target_param.data)
+
+
+class DDPGAgent:
+    def __init__(self, state_size:int, action_size:int, replay_buffer: ReplayBuffer):
+        self.actor_local = PolicyNetwork(1234, state_size, action_size)
+        self.actor_target = PolicyNetwork(1234, state_size, action_size)
+        hard_update(self.actor_local, self.actor_target)
+
+        self.critic_local = PolicyNetwork(1234, (state_size + action_size), 1, output_activation=lambda x: x)
+        self.critic_target = PolicyNetwork(1234, (state_size + action_size), 1, output_activation=lambda x: x)
+        hard_update(self.critic_local, self.critic_target)
+
+        self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=LR)
+        self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=LR)
+        self.replay_buffer = replay_buffer
+
+    def act(self, state):
+        with torch.no_grad():
+            actions = self.actor_local.forward(state)
+        return actions
+
+    def learn(self, gamma):
+        if len(self.replay_buffer.memory) > self.replay_buffer.batch_size:
+            states, actions, rewards, next_states, dones = self.replay_buffer.sample()
+
+            # Update the critic
+            action_selection = self.actor_target(next_states).detach()
+            yi = rewards + gamma*self.critic_target(torch.cat([next_states, action_selection], 1)).detach()
+            y = self.critic_local(torch.cat([states, actions], 1))
+            critic_loss = F.mse_loss(yi, y)
+            self.critic_optimizer.zero_grad()
+            critic_loss.backward()
+            self.critic_optimizer.step()
+
+            # Update the actor
+            actor_actions = self.actor_local(states)
+            policy_loss = -self.critic_local(torch.cat([states, actor_actions], 1)).mean()
+            self.actor_optimizer.zero_grad()
+            policy_loss.backward()
+            self.actor_optimizer.step()
+
+            soft_update(self.actor_local, self.actor_target, TAU)
+            soft_update(self.critic_local, self.critic_target, TAU)
+
+
