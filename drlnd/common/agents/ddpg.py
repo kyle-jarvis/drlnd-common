@@ -4,10 +4,12 @@ import torch.optim as optim
 from ..model import SimpleFCNetwork
 from .config import LR, BUFFER_SIZE, GAMMA, TAU, device
 from .utils import hard_update, soft_update, ReplayBuffer
+from .base import BaseAgent
 
 
-class DDPGAgent:
+class DDPGAgent(BaseAgent):
     def __init__(self, state_size:int, action_size:int, replay_buffer: ReplayBuffer):
+        super().__init__()
         self.actor_local = SimpleFCNetwork(1234, state_size, action_size)
         self.actor_target = SimpleFCNetwork(1234, state_size, action_size)
         hard_update(self.actor_local, self.actor_target)
@@ -19,6 +21,8 @@ class DDPGAgent:
         self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=LR)
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=LR)
         self.replay_buffer = replay_buffer
+
+        self.networks = {"critic_local": self.critic_local, "actor_local": self.actor_local}
 
     def act(self, state):
         with torch.no_grad():
