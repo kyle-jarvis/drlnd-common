@@ -5,8 +5,8 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from ..model import QNetwork, SimpleFCNetwork
-from .utils import soft_update, hard_update, ReplayBuffer
-from . import LR, BUFFER_SIZE, GAMMA, TAU, UPDATE_EVERY, COPY_WEIGHTS_EVERY, device
+from .utils import soft_update, hard_update, ReplayBuffer, LearningStrategy, TargetNetworkUpdateStrategy
+from .config import LR, BUFFER_SIZE, GAMMA, TAU, UPDATE_EVERY, COPY_WEIGHTS_EVERY, device
 
 
 class Agent():
