@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Union, List
 
 class QNetwork(nn.Module):
     """Actor (Policy) Model."""
@@ -29,20 +30,34 @@ class QNetwork(nn.Module):
         return x
 
 
-class PolicyNetwork(nn.Module):
-    def __init__(self, seed, state_size: int, action_size: int, hidden_layer_size: int = 256, output_activation = F.tanh):
-        super(PolicyNetwork, self).__init__()
+class SimpleFCNetwork(nn.Module):
+    def __init__(
+        self, 
+        seed, 
+        input_size: int, 
+        output_size: int, 
+        hidden_layer_size: Union[int, List[int]] = 256, 
+        output_activation = F.tanh):
+
+        super(SimpleFCNetwork, self).__init__()
         self.seed = torch.manual_seed(seed)
 
-        self.fc1 = torch.nn.Linear(state_size, hidden_layer_size)
-        self.fc2 = torch.nn.Linear(hidden_layer_size, hidden_layer_size)
-        self.fc3 = torch.nn.Linear(hidden_layer_size, action_size)
+        if isinstance(hidden_layer_size, int):
+            n_hidden_layers = 2
+            dims = [input_size, *n_hidden_layers*[hidden_layer_size], output_size]
+
+        elif isinstance(hidden_layer_size, list):
+            dims = [input_size, *hidden_layer_size, output_size]
+
+        self.layers = nn.ModuleList(
+            [nn.Linear(x1, x2) for x1, x2 in zip(dims[:-1], dims[1:])]
+            )
 
         self.output_activation = output_activation
+        self.gates = [F.relu for x in dims[1:-1]] + [self.output_activation]
 
     def forward(self, state):
-        x = F.relu(self.fc1(state))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        x = self.output_activation(x)
+        x = state
+        for gate, layer in zip(self.gates, self.layers):
+            x = gate(layer(x))
         return x
