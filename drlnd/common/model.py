@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Union, List
 
+
+# TODO: Remove references in navigation project in favaour of SimpleFCNetwork
 class QNetwork(nn.Module):
     """Actor (Policy) Model."""
 

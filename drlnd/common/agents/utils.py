@@ -1,8 +1,9 @@
 from collections import deque, namedtuple
+from enum import Enum
 import numpy as np
 import torch
 import random
-from . import device
+from .config import device
 
 
 class LearningStrategy(Enum):
@@ -61,7 +62,7 @@ class ReplayBuffer:
         self.memory = deque(maxlen=buffer_size)  
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-        self.seed = seedrandom.seed(seed)
+        self.seed = random.seed(seed)
 
         if action_dtype == ActionType.CONTINUOUS:
             self.get_action_as = lambda tensor: tensor.float()

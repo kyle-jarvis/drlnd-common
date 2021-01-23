@@ -1,9 +1,9 @@
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from .model import SimpleFCNetwork
+from ..model import SimpleFCNetwork
+from .config import LR, BUFFER_SIZE, GAMMA, TAU, device
 from .utils import hard_update, soft_update, ReplayBuffer
-from . import LR, BUFFER_SIZE, GAMMA, TAU, device
 
 
 class DDPGAgent:
