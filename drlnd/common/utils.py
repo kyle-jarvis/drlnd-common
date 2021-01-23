@@ -100,9 +100,10 @@ def get_next_results_directory() -> str:
         except:
             pass
     if len(matches) == 0:
-        return "run000"
-    next_index = f"{(max(matches) + 1):03}"
-    return "run"+next_index
+        next_index = "000"
+    else:
+        next_index = f"{(max(matches) + 1):03}"
+    return os.path.join(results_directory, "run"+next_index)
 
 
 def _load_results(learning_strategy: str, n_points: int):
