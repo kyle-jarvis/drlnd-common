@@ -8,7 +8,7 @@ from .base import BaseAgent
 
 
 class DDPGAgent(BaseAgent):
-    def __init__(self, state_size:int, action_size:int, replay_buffer: ReplayBuffer):
+    def __init__(self, state_size:int, action_size:int, replay_buffer: ReplayBuffer = None):
         super().__init__()
         self.actor_local = SimpleFCNetwork(1234, state_size, action_size)
         self.actor_target = SimpleFCNetwork(1234, state_size, action_size)
@@ -24,12 +24,23 @@ class DDPGAgent(BaseAgent):
 
         self.networks = {"critic_local": self.critic_local, "actor_local": self.actor_local}
 
-    def act(self, state):
+        self.action_size = action_size
+
+        if self.replay_buffer is not None:
+            self.learn = lambda *args, **kwargs: self._learn(*args, **kwargs)
+
+    def act(self, state, policy_suppression: 1.0, noise_func = None,):
         with torch.no_grad():
-            actions = self.actor_local.forward(state)
+            actions = policy_suppression*self.actor_local.forward(state)
+        if noise_func is not None:
+            action_noise = noise_func()
+            actions = torch.clamp(actions+action_noise, -1.0, 1.0)
         return actions
 
-    def learn(self, gamma):
+    def learn(self):
+        raise NotImplementedError("Agents without replay buffers cant learn")
+
+    def _learn(self, gamma):
         if len(self.replay_buffer.memory) > self.replay_buffer.batch_size:
             states, actions, rewards, next_states, dones = self.replay_buffer.sample()
 
