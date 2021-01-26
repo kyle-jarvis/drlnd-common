@@ -100,9 +100,10 @@ def get_next_results_directory() -> str:
         except:
             pass
     if len(matches) == 0:
-        return "run000"
-    next_index = f"{(max(matches) + 1):03}"
-    return "run"+next_index
+        next_index = "000"
+    else:
+        next_index = f"{(max(matches) + 1):03}"
+    return os.path.join(results_directory, "run"+next_index)
 
 
 def _load_results(learning_strategy: str, n_points: int):
@@ -129,4 +130,43 @@ def load_results(directory: str):
     x = np.arange(len(ma))
     
     return scores, ma, x, conf
+
+
+class LinearSequence:
+    def __init__(self, initial_value, steps, min_value = None):
+        self.x = initial_value
+        self.step = 0.0
+        self.steps = steps
+        if min_value is not None:
+            self.out = lambda y: max(y, min_value)
+        else:
+            self.out = lambda y: y
+
+    def _sample(self):
+        result = self.out(self.x*(1.0 - (self.step/self.steps)))
+        self.step += 1.0
+        return result
+
+    def __call__(self):
+        return self._sample()
+
+
+class OrnsteinUhlenbeckProcess:
+    def __init__(self, size, std, theta=.15, dt=1e-2, x0=None):
+        self.theta = theta
+        self.mu = 0
+        self.std = std
+        self.dt = dt
+        self.x0 = x0
+        self.size = size
+        self.reset_states()
+
+    def sample(self):
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.std * np.sqrt(
+            self.dt) * np.random.randn(*self.size)
+        self.x_prev = x
+        return x
+
+    def reset_states(self):
+        self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
 

@@ -7,9 +7,10 @@ import torch.optim as optim
 from ..model import QNetwork, SimpleFCNetwork
 from .utils import soft_update, hard_update, ReplayBuffer, LearningStrategy, TargetNetworkUpdateStrategy
 from .config import LR, BUFFER_SIZE, GAMMA, TAU, UPDATE_EVERY, COPY_WEIGHTS_EVERY, device
+from .base import BaseAgent
 
 
-class Agent():
+class Agent(BaseAgent):
     """Interacts with and learns from the environment."""
 
     def __init__(
@@ -35,6 +36,8 @@ class Agent():
         :param hidden_layer_width: Size of intermediate , defaults to 64
         :type hidden_layer_width: int, optional
         """
+        super().__init__()
+
         self.state_size = state_size
         self.action_size = action_size
         self.seed = random.seed(seed)
@@ -43,7 +46,8 @@ class Agent():
         self.qnetwork_local = QNetwork(state_size, action_size, seed, hidden_layer_width=hidden_layer_width).to(device)
         self.qnetwork_target = QNetwork(state_size, action_size, seed, hidden_layer_width=hidden_layer_width).to(device)
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
-        #self.loss = torch.nn.MSELoss()
+       
+        self.networks = {'qnetwork_local': self.qnetwork_local}
 
         # Replay memory
         self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed)
