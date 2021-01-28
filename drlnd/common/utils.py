@@ -150,6 +150,8 @@ class LinearSequence:
     def __call__(self):
         return self._sample()
 
+# Below snippet is taken from the following location:
+# https://github.com/ShangtongZhang/DeepRL/blob/master/deep_rl/component/random_process.py
 
 class OrnsteinUhlenbeckProcess:
     def __init__(self, size, std, theta=.15, dt=1e-2, x0=None):
