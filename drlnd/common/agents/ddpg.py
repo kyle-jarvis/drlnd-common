@@ -8,14 +8,21 @@ from .base import BaseAgent
 
 
 class DDPGAgent(BaseAgent):
-    def __init__(self, state_size:int, action_size:int, replay_buffer: ReplayBuffer = None):
+    def __init__(
+        self, 
+        state_size:int, 
+        action_size:int, 
+        replay_buffer: ReplayBuffer = None, 
+        hidden_layer_size = None):
+
         super().__init__()
-        self.actor_local = SimpleFCNetwork(1234, state_size, action_size)
-        self.actor_target = SimpleFCNetwork(1234, state_size, action_size)
+        network_kwargs = {'hidden_layer_size': hidden_layer_size} if hidden_layer_size is not None else {}
+        self.actor_local = SimpleFCNetwork(1234, state_size, action_size, **network_kwargs)
+        self.actor_target = SimpleFCNetwork(1234, state_size, action_size, **network_kwargs)
         hard_update(self.actor_local, self.actor_target)
 
-        self.critic_local = SimpleFCNetwork(1234, (state_size + action_size), 1, output_activation=lambda x: x)
-        self.critic_target = SimpleFCNetwork(1234, (state_size + action_size), 1, output_activation=lambda x: x)
+        self.critic_local = SimpleFCNetwork(1234, (state_size + action_size), 1, output_activation=lambda x: x, **network_kwargs)
+        self.critic_target = SimpleFCNetwork(1234, (state_size + action_size), 1, output_activation=lambda x: x, **network_kwargs)
         hard_update(self.critic_local, self.critic_target)
 
         self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=LR)
