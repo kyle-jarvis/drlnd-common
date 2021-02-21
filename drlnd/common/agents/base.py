@@ -1,6 +1,7 @@
 import os
 import re
 import torch
+import numpy as np
 
 
 class BaseAgent:
@@ -28,6 +29,12 @@ class BaseAgent:
                 .match(filename)
                 .groups()[0]
                 )
+            print(f"Setting {network_name} from {filepath}")
+            if network_name == "agent_0_policy":
+                print("Caught agent_0_policy")
+                this_network = self.agents['agent_0']['networks']['policy']
+                print(f"Network output before = \n {this_network(torch.from_numpy(np.array([[1.0 for i in range(24)]])).float())}")
+                print(self.networks[network_name])
             (
                 self.networks[network_name]
                 .load_state_dict(
@@ -36,4 +43,7 @@ class BaseAgent:
                     loc: storage)
                     )
             )
+            if network_name == "agent_0_policy":
+                this_network = self.agents['agent_0']['networks']['policy']
+                print(f"Network output after = \n{this_network(torch.from_numpy(np.array([[1.0 for i in range(24)]])).float())}")
 
