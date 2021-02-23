@@ -54,8 +54,8 @@ class SimpleFCNetwork(nn.Module):
         self.layers = nn.ModuleList(
             [nn.Linear(x1, x2) for x1, x2 in zip(dims[:-1], dims[1:])]
             )
-        nn.init.uniform_(self.layers[-1].weight, -3e-3, 3e-3)
-        nn.init.uniform_(self.layers[-1].bias, -3e-3, 3e-3)
+        nn.init.uniform_(self.layers[-1].weight, -3e-5, 3e-5)
+        nn.init.uniform_(self.layers[-1].bias, -3e-5, 3e-5)
 
         self.output_activation = output_activation
         self.gates = [F.relu for x in dims[1:-1]] + [self.output_activation]
