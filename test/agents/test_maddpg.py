@@ -44,6 +44,8 @@ class TestMADDPG(unittest.TestCase):
 
         self.assertIsInstance(maddpg, MADDPGAgent2)
 
+        # Test we can easily get the actions, given the set of observations, by
+        # using the maddpg agent to access and evaluate the policy networks.
         actions = maddpg.act(
             states={
                 "default_brain": [
@@ -57,6 +59,7 @@ class TestMADDPG(unittest.TestCase):
         self.assertEqual(2, len(actions["default_brain"]))
         self.assertEqual(actions["default_brain"][0].dtype, torch.int64)
 
+        # Test we can easily get the actions from the policy/target policy networks
         joined_state_tensor = torch.cat(
             [torch.from_numpy(np.random.randn(32)).float() for i in range(2)]
         ).unsqueeze(0)

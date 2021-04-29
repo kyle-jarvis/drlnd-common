@@ -110,10 +110,17 @@ def soft_update(local_model, target_model, tau):
 class UnityEnvWrapper:
     # USe getattr to pass calls to unity env by default
     # add step call to manage updating / recording sars tuple, then invoking underlying step
-    def __init__(self, unity_env, brain_spec_list):
+    def __init__(self, unity_env, brain_spec_list, action_type: ActionType):
         self.unity_env = unity_env
         self.brain_spec_list = brain_spec_list
         self.env_state = None
+        self.action_type = action_type
+        if self.action_type == ActionType.DISCRETE:
+            self.action_transformer = lambda x: dict(
+                [(k, np.argmax(v, axis=-1)) for k, v in x.items()]
+            )
+        else:
+            self.action_transformer = lambda x: x
 
     def _apply_brain_spec_func(self, function_to_apply):
         return {
@@ -141,6 +148,7 @@ class UnityEnvWrapper:
         assert "vector_action" in kwargs.keys()
         assert self.env_state is not None
         self.actions = kwargs["vector_action"]
+        kwargs["vector_action"] = self.action_transformer(kwargs["vector_action"])
         self.states = self.get_states()
         self.env_state = self.unity_env.step(*args, **kwargs)
         self.next_states = self.get_states()
@@ -201,20 +209,22 @@ class ReplayBuffer:
 
     def add_from_dicts(self, state, action, reward, next_state, done):
         # print("state before", state)
-        state = [state[brain_name] for brain_name in self.brain_order]
+        state = [np.hstack(state[brain_name]) for brain_name in self.brain_order]
         # print("state after", np.concatenate(state))
-        action = [action[brain_name] for brain_name in self.brain_order]
+        action = [np.hstack(action[brain_name]) for brain_name in self.brain_order]
         # print("reward before", reward)
-        reward = [reward[brain_name] for brain_name in self.brain_order]
+        reward = [np.hstack(reward[brain_name]) for brain_name in self.brain_order]
         # print("reward after", reward)
-        next_state = [next_state[brain_name] for brain_name in self.brain_order]
-        done = [done[brain_name] for brain_name in self.brain_order]
+        next_state = [
+            np.hstack(next_state[brain_name]) for brain_name in self.brain_order
+        ]
+        done = [np.hstack(done[brain_name]) for brain_name in self.brain_order]
         self.add(
             np.concatenate(state),
             np.concatenate(action),
-            reward,
+            np.concatenate(reward),
             np.concatenate(next_state),
-            done,
+            np.concatenate(done),
         )
 
     def sample(self):

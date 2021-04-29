@@ -18,6 +18,7 @@ from collections import OrderedDict, defaultdict
 from itertools import starmap, chain
 
 LR = 5e-5
+F.gumbel_softmax
 
 
 class MADDPGAgent(BaseAgent):
@@ -306,7 +307,7 @@ class MADDPGAgent2(BaseAgent):
                     if noise_func is not None:
                         action_noise = noise_func()
                         action = torch.clamp(action + action_noise, -1.0, 1.0)
-                    brain_name_actions.append(action)
+                    brain_name_actions.append(action.numpy())
                 agent_actions.update({brain_name: brain_name_actions})
         return agent_actions
 

@@ -29,37 +29,10 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
 
         # Create the wrapper
         print(brain_spec_list)
-        env_wrapper = UnityEnvWrapper(env, brain_spec_list)
+        env_wrapper = UnityEnvWrapper(env, brain_spec_list, ActionType.DISCRETE)
         env_wrapper.reset(train_mode=False)
 
         agent_inventory = AgentInventory(brain_spec_list)
-
-        maddpg = MADDPGAgent2(
-            agent_inventory,
-            hidden_layer_size=256,
-            policy_network_kwargs={"output_activation": lambda x: torch.argmax(x)},
-        )
-
-        self.assertIsInstance(maddpg, MADDPGAgent2)
-
-        # Test we can easily get the actions, given the set of observations, by
-        # using the maddpg agent to access and evaluate the policy networks.
-        print(env_wrapper.get_states())
-        actions = maddpg.act(
-            states=env_wrapper.get_states(),
-            policy_suppression=1.0,
-        )
-
-        # Check that we can take a step based on the resulting actions.
-        env_wrapper.step(vector_action=actions)
-
-        # Check that we can get the SARS' tuples easily.
-        states, actions, rewards, next_states, dones = env_wrapper.sars()
-        self.assertIsInstance(states, dict)
-        self.assertIsInstance(actions, dict)
-        self.assertIsInstance(rewards, dict)
-        self.assertIsInstance(next_states, dict)
-        self.assertIsInstance(dones, dict)
 
         buffer = ReplayBuffer(
             None,
@@ -72,6 +45,36 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
 
         # Check we can add observations
         print(buffer.brain_order)
+
+        maddpg = MADDPGAgent2(
+            agent_inventory,
+            hidden_layer_size=256,
+            policy_network_kwargs={"output_activation": lambda x: x},
+            replay_buffer=buffer,
+        )
+
+        self.assertIsInstance(maddpg, MADDPGAgent2)
+
+        for i in range(10):
+            # Test we can easily get the actions, given the set of observations, by
+            # using the maddpg agent to access and evaluate the policy networks.
+            print(env_wrapper.get_states())
+            actions = maddpg.act(
+                states=env_wrapper.get_states(),
+                policy_suppression=1.0,
+            )
+
+            # Check that we can take a step based on the resulting actions.
+            env_wrapper.step(vector_action=actions)
+
+        # Check that we can get the SARS' tuples easily.
+        states, actions, rewards, next_states, dones = env_wrapper.sars()
+        self.assertIsInstance(states, dict)
+        self.assertIsInstance(actions, dict)
+        self.assertIsInstance(rewards, dict)
+        self.assertIsInstance(next_states, dict)
+        self.assertIsInstance(dones, dict)
+
         buffer.add_from_dicts(states, actions, rewards, next_states, dones)
 
         s, a, r, ns, d = buffer.sample()
@@ -79,3 +82,6 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
         print(f"actions = \n{a}")
         print(f"rewards = \n{r}")
         print(f"dones = \n{d}")
+
+        # See if the agent can learn
+        maddpg.learn(0.99)
