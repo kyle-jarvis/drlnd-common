@@ -1,14 +1,12 @@
+import re
+import random
 from collections import deque, namedtuple
+from typing import NamedTuple, List
 from enum import Enum
 import numpy as np
 import torch
-import random
 from .config import device
-from itertools import chain
-from typing import NamedTuple, List, Dict
 from unityagents import UnityEnvironment
-import re
-from copy import deepcopy
 
 
 def get_unity_env(path: str):
@@ -52,6 +50,7 @@ class ActionType(Enum):
 
 
 class BrainAgentSpec(NamedTuple):
+    "Container for Unity Brain specification details."
     name: str
     num_agents: int
     state_size: int
@@ -59,6 +58,7 @@ class BrainAgentSpec(NamedTuple):
 
 
 class MultiAgentSpec(NamedTuple):
+    "Container for agent specification in a multi-agent setting."
     brain_name: str
     agent_name: str
     state_size: int
@@ -67,12 +67,6 @@ class MultiAgentSpec(NamedTuple):
     agent_index: int
     action_slice: List[slice]
     state_slice: List[slice]
-
-
-class AgentSpec:
-    def __init__(self, state_size: int, action_size: int):
-        self.state_size = state_size
-        self.action_size = action_size
 
 
 def hard_update(local_model, target_model):
@@ -108,6 +102,13 @@ def soft_update(local_model, target_model, tau):
 
 
 class UnityEnvWrapper:
+    """Wrapper around Unity Environment objects that tracks information to be
+    loaded into a ReplayBuffer
+
+    :return: [description]
+    :rtype: [type]
+    """
+
     # USe getattr to pass calls to unity env by default
     # add step call to manage updating / recording sars tuple, then invoking underlying step
     def __init__(self, unity_env, brain_spec_list, action_type: ActionType):
@@ -121,6 +122,11 @@ class UnityEnvWrapper:
             )
         else:
             self.action_transformer = lambda x: x
+        self.states = None
+        self.actions = None
+        self.rewards = None
+        self.dones = None
+        self.next_states = None
 
     def _apply_brain_spec_func(self, function_to_apply):
         return {
@@ -170,13 +176,11 @@ class ReplayBuffer:
 
     def __init__(
         self,
-        action_size,
         buffer_size,
         batch_size,
-        seed,
+        seed=1234,
         action_dtype: ActionType = ActionType.DISCRETE,
         brain_agents: List[BrainAgentSpec] = None,
-        unity_env=None,
     ):
         """Initialize a ReplayBuffer object.
 
@@ -188,14 +192,13 @@ class ReplayBuffer:
             seed (int): random seed
         """
         self.brain_order = [brain_spec.name for brain_spec in brain_agents]
-        self.action_size = action_size
         self.memory = deque(maxlen=buffer_size)
         self.batch_size = batch_size
         self.experience = namedtuple(
             "Experience",
             field_names=["state", "action", "reward", "next_state", "done"],
         )
-        self.seed = random.seed(seed)
+        random.seed(seed)
 
         if action_dtype == ActionType.CONTINUOUS:
             self.get_action_as = lambda tensor: tensor.float()
@@ -209,23 +212,34 @@ class ReplayBuffer:
 
     def add_from_dicts(self, state, action, reward, next_state, done):
         # print("state before", state)
-        state = [np.hstack(state[brain_name]) for brain_name in self.brain_order]
-        # print("state after", np.concatenate(state))
-        action = [np.hstack(action[brain_name]) for brain_name in self.brain_order]
-        # print("reward before", reward)
-        reward = [np.hstack(reward[brain_name]) for brain_name in self.brain_order]
-        # print("reward after", reward)
-        next_state = [
-            np.hstack(next_state[brain_name]) for brain_name in self.brain_order
-        ]
-        done = [np.hstack(done[brain_name]) for brain_name in self.brain_order]
-        self.add(
-            np.concatenate(state),
-            np.concatenate(action),
-            np.concatenate(reward),
-            np.concatenate(next_state),
-            np.concatenate(done),
+        state = np.concatenate(
+            [np.hstack(state[brain_name]) for brain_name in self.brain_order]
         )
+        # print("state after", np.concatenate(state))
+        action = np.concatenate(
+            [np.hstack(action[brain_name]) for brain_name in self.brain_order]
+        )
+        # print("reward before", reward)
+        reward = np.concatenate(
+            [np.hstack(reward[brain_name]) for brain_name in self.brain_order]
+        )
+        # print("reward after", reward)
+        next_state = np.concatenate(
+            [np.hstack(next_state[brain_name]) for brain_name in self.brain_order]
+        )
+        done = np.concatenate(
+            [np.hstack(done[brain_name]) for brain_name in self.brain_order]
+        )
+
+        self.add(
+            state,
+            action,
+            reward,
+            next_state,
+            done,
+        )
+
+        return state, action, reward, next_state, done
 
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
@@ -319,6 +333,7 @@ class AgentInventory:
                 state_offset += brain.state_size
                 agent_index += 1
             self.agents.update({brain.name: this_brains_agents})
+        self.num_agents = agent_index
 
     def __repr__(self):
         return repr(self.agents)
@@ -332,8 +347,3 @@ class AgentInventory:
             return self.agents[brain][int(agent_index)]
         else:
             raise Exception("Cannot access any member")
-
-
-def slices_from_brain_agents(brain_agents: List[Dict[str, List[AgentSpec]]]):
-    # brain_agents = {kyle: [agent_spec1, agent_spec2]}
-    pass

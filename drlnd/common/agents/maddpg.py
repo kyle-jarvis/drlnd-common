@@ -7,7 +7,6 @@ from .utils import (
     hard_update,
     soft_update,
     ReplayBuffer,
-    AgentSpec,
     AgentInventory,
     MultiAgentSpec,
 )
@@ -24,7 +23,7 @@ F.gumbel_softmax
 class MADDPGAgent(BaseAgent):
     def __init__(
         self,
-        agent_specs: List[Dict[str, List[AgentSpec]]],
+        agent_specs,  #: List[Dict[str, List[AgentSpec]]],
         replay_buffer: ReplayBuffer = None,
         hidden_layer_size=None,
     ):
@@ -286,6 +285,20 @@ class MADDPGAgent2(BaseAgent):
         if self.replay_buffer is not None:
             self.learn = lambda *args, **kwargs: self._learn(*args, **kwargs)
 
+        # For saving / loading convenience
+        self.networks = {
+            "_".join([agent_item.spec.agent_name, network_name]): getattr(
+                agent_item.networks, network_name
+            )
+            for agent_item in chain(*self.agents.values())
+            for network_name in [
+                "policy",
+                "policy_target",
+                "critic",
+                "critic_target",
+            ]
+        }
+
     def act(
         self,
         states,
@@ -336,9 +349,9 @@ class MADDPGAgent2(BaseAgent):
                 for agent_items in agent_items_list:
 
                     networks, optimizers, agent_spec = (
-                        agent_items["networks"],
-                        agent_items["optimizers"],
-                        agent_items["spec"],
+                        getattr(agent_items, "networks"),
+                        getattr(agent_items, "optimizers"),
+                        getattr(agent_items, "spec"),
                     )
 
                     (
@@ -357,35 +370,35 @@ class MADDPGAgent2(BaseAgent):
                     )
 
                     with torch.no_grad():
-                        TD = gamma * networks["critic_target"](
+                        TD = gamma * networks.critic_target(
                             torch.cat(
                                 [next_states, *target_policy_action_selections], 1
                             )
                         )
                         yi = reward + TD
 
-                    y = networks["critic"](torch.cat([states, actions], 1))
+                    y = networks.critic(torch.cat([states, actions], 1))
 
                     critic_loss = F.mse_loss(yi, y)
 
-                    optimizers["critic"].zero_grad()
+                    optimizers.critic.zero_grad()
                     critic_loss.backward()
-                    optimizers["critic"].step()
+                    optimizers.critic.step()
 
                     # Update the actor
 
-                    actions[agent_spec.action_indices] = networks["policy"](
-                        states[agent_spec.state_indices]
+                    actions[agent_spec.action_slice] = networks.policy(
+                        states[agent_spec.state_slice]
                     )
 
-                    policy_loss = -networks["critic"](
+                    policy_loss = -networks.critic(
                         torch.cat([states, actions], 1)
                     ).mean()
-                    optimizers["policy"].zero_grad()
+                    optimizers.policy.zero_grad()
                     policy_loss.backward()
-                    optimizers["policy"].step()
+                    optimizers.policy.step()
 
             for agent_items in chain(*self.agents.values()):
-                networks = agent_items["networks"]
-                soft_update(networks["policy"], networks["policy_target"], TAU)
-                soft_update(networks["critic"], networks["critic_target"], TAU)
+                networks = agent_items.networks
+                soft_update(networks.policy, networks.policy_target, TAU)
+                soft_update(networks.critic, networks.critic_target, TAU)
