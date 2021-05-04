@@ -13,16 +13,13 @@ from unityagents import UnityEnvironment
 
 
 class BananaEnv(Enum):
-    STANDARD = 'Banana_Linux/Banana.x86_64'
-    HEADLESS = 'Banana_Linux_NoVis/Banana.x86_64'
-    VISUAL = 'VisualBanana_Linux/Banana.x86_64'
+    STANDARD = "Banana_Linux/Banana.x86_64"
+    HEADLESS = "Banana_Linux_NoVis/Banana.x86_64"
+    VISUAL = "VisualBanana_Linux/Banana.x86_64"
 
 
-def path_from_project_home(path:str, or_else: str = None):
-    origin = (
-        os.environ['PROJECT_HOME'] if 'PROJECT_HOME' in os.environ
-        else or_else
-    )
+def path_from_project_home(path: str, or_else: str = None):
+    origin = os.environ["PROJECT_HOME"] if "PROJECT_HOME" in os.environ else or_else
     assert origin is not None
     return os.path.join(origin, path)
 
@@ -38,7 +35,7 @@ def get_environment_executable(environment: BananaEnv) -> str:
     :rtype: str
     """
     assert isinstance(environment, BananaEnv)
-    base_directory = path_from_project_home('unity_environments')
+    base_directory = path_from_project_home("unity_environments")
     return os.path.join(base_directory, environment.value)
 
 
@@ -60,7 +57,7 @@ def get_env(headless: bool) -> UnityEnvironment:
 
 
 def get_env_properties(env: UnityEnvironment) -> Tuple[int, int]:
-    """Inspects the default brain from the unity environment to extract the 
+    """Inspects the default brain from the unity environment to extract the
     action size, and the state size given by the vector observations property
     of the agent.
 
@@ -72,11 +69,11 @@ def get_env_properties(env: UnityEnvironment) -> Tuple[int, int]:
     brain_name = env.brain_names[0]
     brain = env.brains[brain_name]
     action_size = brain.vector_action_space_size
-    print('Number of actions:', action_size)
+    print("Number of actions:", action_size)
     env_info = env.reset(train_mode=True)[brain_name]
     state = env_info.vector_observations[0]
     state_size = len(state)
-    print('State size:', state_size)
+    print("State size:", state_size)
     return action_size, state_size
 
 
@@ -87,8 +84,8 @@ def get_next_results_directory() -> str:
     :return: Path to the next results subdirectory.
     :rtype: str
     """
-    pattern = re.compile('run([0-9]*)')
-    results_directory = path_from_project_home('results')
+    pattern = re.compile("run([0-9]*)")
+    results_directory = path_from_project_home("results")
     if not os.path.exists(results_directory):
         os.mkdir(results_directory)
     contents = os.listdir(results_directory)
@@ -103,13 +100,13 @@ def get_next_results_directory() -> str:
         next_index = "000"
     else:
         next_index = f"{(max(matches) + 1):03}"
-    return os.path.join(results_directory, "run"+next_index)
+    return os.path.join(results_directory, "run" + next_index)
 
 
 def _load_results(learning_strategy: str, n_points: int):
     solution_directory = os.environ["PROJECT_HOME"]
-    checkpoint_directory = f'checkpoints/{learning_strategy}'
-    scores_file = os.path.join(solution_directory, checkpoint_directory, 'scores.txt')
+    checkpoint_directory = f"checkpoints/{learning_strategy}"
+    scores_file = os.path.join(solution_directory, checkpoint_directory, "scores.txt")
     scores = pandas.Series(np.loadtxt(scores_file)[:n_points])
     rolling_window = 100
     ma = scores.rolling(rolling_window, center=True).mean()
@@ -118,22 +115,22 @@ def _load_results(learning_strategy: str, n_points: int):
 
 
 def load_results(directory: str):
-    results_directory = path_from_project_home('results')
-    conf_path = os.path.join(results_directory, directory, 'parameters.yml')
-    with open(conf_path, 'r') as f:
-        conf =  yaml.load(f, Loader=yaml.BaseLoader)
-                    
-    scores_file = os.path.join(results_directory, directory, 'scores.txt')
+    results_directory = path_from_project_home("results")
+    conf_path = os.path.join(results_directory, directory, "parameters.yml")
+    with open(conf_path, "r") as f:
+        conf = yaml.load(f, Loader=yaml.BaseLoader)
+
+    scores_file = os.path.join(results_directory, directory, "scores.txt")
     scores = pandas.Series(np.loadtxt(scores_file)[:1500])
     rolling_window = 100
     ma = scores.rolling(rolling_window, center=True).mean()
     x = np.arange(len(ma))
-    
+
     return scores, ma, x, conf
 
 
 class LinearSequence:
-    def __init__(self, initial_value, steps, min_value = None):
+    def __init__(self, initial_value, steps, min_value=None):
         self.x = initial_value
         self.step = 0.0
         self.steps = steps
@@ -143,18 +140,20 @@ class LinearSequence:
             self.out = lambda y: y
 
     def _sample(self):
-        result = self.out(self.x*(1.0 - (self.step/self.steps)))
+        result = self.out(self.x * (1.0 - (self.step / self.steps)))
         self.step += 1.0
         return result
 
     def __call__(self):
         return self._sample()
 
+
 # Below snippet is taken from the following location:
 # https://github.com/ShangtongZhang/DeepRL/blob/master/deep_rl/component/random_process.py
 
+
 class OrnsteinUhlenbeckProcess:
-    def __init__(self, size, std, theta=.15, dt=1e-2, x0=None):
+    def __init__(self, size, std, theta=0.15, dt=1e-2, x0=None):
         self.theta = theta
         self.mu = 0
         self.std = std
@@ -164,11 +163,13 @@ class OrnsteinUhlenbeckProcess:
         self.reset_states()
 
     def sample(self):
-        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.std * np.sqrt(
-            self.dt) * np.random.randn(*self.size)
+        x = (
+            self.x_prev
+            + self.theta * (self.mu - self.x_prev) * self.dt
+            + self.std * np.sqrt(self.dt) * np.random.randn(*self.size)
+        )
         self.x_prev = x
         return x
 
     def reset_states(self):
         self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
-

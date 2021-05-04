@@ -8,7 +8,7 @@ from typing import Union, List
 class QNetwork(nn.Module):
     """Actor (Policy) Model."""
 
-    def __init__(self, state_size, action_size, seed, hidden_layer_width = 64):
+    def __init__(self, state_size, action_size, seed, hidden_layer_width=64):
         """Initialize parameters and build model.
         Params
         ======
@@ -34,28 +34,36 @@ class QNetwork(nn.Module):
 
 class SimpleFCNetwork(nn.Module):
     def __init__(
-        self, 
-        seed, 
-        input_size: int, 
-        output_size: int, 
-        hidden_layer_size: Union[int, List[int]] = 256, 
-        output_activation = F.tanh):
+        self,
+        seed,
+        input_size: int,
+        output_size: int,
+        hidden_layer_size: Union[int, List[int]] = 256,
+        output_activation=F.tanh,
+        scale_init_output_coef=3e-5,
+    ):
 
         super(SimpleFCNetwork, self).__init__()
         self.seed = torch.manual_seed(seed)
 
         if isinstance(hidden_layer_size, int):
             n_hidden_layers = 2
-            dims = [input_size, *n_hidden_layers*[hidden_layer_size], output_size]
+            dims = [input_size, *n_hidden_layers * [hidden_layer_size], output_size]
 
         elif isinstance(hidden_layer_size, list):
             dims = [input_size, *hidden_layer_size, output_size]
 
         self.layers = nn.ModuleList(
             [nn.Linear(x1, x2) for x1, x2 in zip(dims[:-1], dims[1:])]
-            )
-        nn.init.uniform_(self.layers[-1].weight, -3e-5, 3e-5)
-        nn.init.uniform_(self.layers[-1].bias, -3e-5, 3e-5)
+        )
+        nn.init.uniform_(
+            self.layers[-1].weight,
+            -1.0 * scale_init_output_coef,
+            scale_init_output_coef,
+        )
+        nn.init.uniform_(
+            self.layers[-1].bias, -1.0 * scale_init_output_coef, scale_init_output_coef
+        )
 
         self.output_activation = output_activation
         self.gates = [F.relu for x in dims[1:-1]] + [self.output_activation]
