@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Tuple
 import numpy as np
 import pandas
+import torch.nn.functional as F
 from unityagents import UnityEnvironment
 
 
@@ -173,3 +174,11 @@ class OrnsteinUhlenbeckProcess:
 
     def reset_states(self):
         self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
+
+def gumbel_softmax_fn(logits, tau: float = 1.0, dim: int = -1):
+    gumbels = (
+        -torch.empty_like(logits).exponential_().log()
+    )  # ~Gumbel(0,1)
+    gumbels = (logits + gumbels) / tau  # ~Gumbel(logits,tau)
+    y_soft = F.gumbel_softmaxgumbels.softmax(dim)
+    return y_soft

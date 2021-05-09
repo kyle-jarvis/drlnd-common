@@ -308,6 +308,7 @@ class MADDPGAgent2(BaseAgent):
         #
         # Assume that states are received like: dict(zip(brain_names, states))
         # Actions are fed to env like: dict(zip(brain_names, actions))
+        # noise_func is a dict of callables
 
         agent_actions = {}
         with torch.no_grad():
@@ -318,7 +319,7 @@ class MADDPGAgent2(BaseAgent):
                     policy_network = self.agents[brain_name][i].networks.policy
                     action = policy_suppression * policy_network(state)
                     if noise_func is not None:
-                        action_noise = noise_func()
+                        action_noise = noise_func[brain_name]()
                         action = torch.clamp(action + action_noise, -1.0, 1.0)
                     brain_name_actions.append(action.numpy())
                 agent_actions.update({brain_name: brain_name_actions})

@@ -192,6 +192,7 @@ class ReplayBuffer:
             seed (int): random seed
         """
         self.brain_order = [brain_spec.name for brain_spec in brain_agents]
+        self.total_agents = sum([brain_spec.num_agents for brain_spec in brain_agents])
         self.memory = deque(maxlen=buffer_size)
         self.batch_size = batch_size
         self.experience = namedtuple(
@@ -199,11 +200,14 @@ class ReplayBuffer:
             field_names=["state", "action", "reward", "next_state", "done"],
         )
         random.seed(seed)
-
-        if action_dtype == ActionType.CONTINUOUS:
-            self.get_action_as = lambda tensor: tensor.float()
-        elif action_dtype == ActionType.DISCRETE:
-            self.get_action_as = lambda tensor: tensor.long()
+        self.latest_reward = [0.0 for _ in range(self.total_agents)]
+        self.latest_done = [0.0 for _ in range(self.total_agents)]
+        
+        self.get_action_as = lambda tensor: tensor.float()
+        #if action_dtype == ActionType.CONTINUOUS:
+        #    self.get_action_as = lambda tensor: tensor.float()
+        #elif action_dtype == ActionType.DISCRETE:
+        #    self.get_action_as = lambda tensor: tensor.long()
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""
@@ -238,6 +242,9 @@ class ReplayBuffer:
             next_state,
             done,
         )
+
+        self.latest_done = done
+        self.latest_reward = reward
 
         return state, action, reward, next_state, done
 

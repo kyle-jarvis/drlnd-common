@@ -1,6 +1,7 @@
 import unittest
 from unittest import skipIf
 import torch
+import torch.nn.functional as F
 import numpy as np
 from drlnd.common.agents.utils import (
     BrainAgentSpec,
@@ -11,7 +12,8 @@ from drlnd.common.agents.utils import (
     ActionType,
     get_unity_env,
 )
-from drlnd.common.agents.maddpg import AgentSpec, MADDPGAgent2
+from drlnd.common.utils import OrnsteinUhlenbeckProcess
+from drlnd.common.agents.maddpg import MADDPGAgent2
 import os
 import re
 
@@ -24,8 +26,15 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
             self.env, self.brain_spec = get_unity_env(os.environ["UNITY_MA_ENV"])
             if re.compile("Tennis.*").match(unity_exe) is not None:
                 self.env_action_type = ActionType.CONTINUOUS
+                self.policy_output_activation = lambda x: x
             elif re.compile("Soccer.*").match(unity_exe) is not None:
                 self.env_action_type = ActionType.DISCRETE
+                def policy_activation(self, x):
+                    if len(x.shape) == 1:
+                        return F.gumbel_softmax(x.unsqueeze(0)).squeeze()
+                    return F.gumbel_softmax(x)
+
+                self.policy_output_activation = policy_activation
             else:
                 raise Exception(f"Don't know how to deal with env: {unity_exe}")
 
@@ -56,7 +65,7 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
         maddpg = MADDPGAgent2(
             agent_inventory,
             hidden_layer_size=256,
-            policy_network_kwargs={"output_activation": lambda x: x},
+            policy_network_kwargs={"output_activation": self.policy_output_activation},
             replay_buffer=buffer,
         )
 
@@ -65,7 +74,6 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
         for i in range(10):
             # Test we can easily get the actions, given the set of observations, by
             # using the maddpg agent to access and evaluate the policy networks.
-            print(env_wrapper.get_states())
             actions = maddpg.act(
                 states=env_wrapper.get_states(),
                 policy_suppression=1.0,
@@ -76,6 +84,7 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
 
             # Check that we can get the SARS' tuples easily.
             states, actions, rewards, next_states, dones = env_wrapper.sars()
+
             self.assertIsInstance(states, dict)
             self.assertIsInstance(actions, dict)
             self.assertIsInstance(rewards, dict)
@@ -92,3 +101,28 @@ class TestMADDPGInUnityEnv(unittest.TestCase):
 
         # See if the agent can learn
         maddpg.learn(0.99)
+
+        # Check that we can add noise to the agent's actions
+        def make_noise_generator(size):
+            noise_generator = OrnsteinUhlenbeckProcess(
+                [size], 1.0, dt=1.0, theta=0.5
+                )
+            noise_callable = lambda: torch.from_numpy(noise_generator.sample()).float()
+
+            return noise_callable
+
+        noise_generators = {brain.name: make_noise_generator(brain.action_size) for brain in brain_spec_list}
+
+        def no_noise_callable(size):
+            return lambda: torch.zeros(size)
+
+        no_noise = {brain.name: no_noise_callable(brain.action_size) for brain in brain_spec_list}
+
+        actions = maddpg.act(
+                    states, policy_suppression=1.0, noise_func=noise_generators
+                )
+
+        actions = maddpg.act(
+                    states, policy_suppression=1.0, noise_func=no_noise
+                )
+
